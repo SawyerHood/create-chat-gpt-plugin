@@ -1,0 +1,51 @@
+openapi: 3.0.3
+info:
+  title: Addition API
+  description: A simple API for adding two numbers.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+
+paths:
+  /api/add:
+    post:
+      summary: Add two numbers
+      operationId: addNumbers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestBody"
+      responses:
+        200:
+          description: The result of the addition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResponseBody"
+        400:
+          description: Bad Request
+
+components:
+  schemas:
+    RequestBody:
+      type: object
+      properties:
+        a:
+          type: number
+          description: The first number to be added.
+        b:
+          type: number
+          description: The second number to be added.
+      required:
+        - a
+        - b
+
+    ResponseBody:
+      type: object
+      properties:
+        result:
+          type: number
+          description: The result of adding the two input numbers.
