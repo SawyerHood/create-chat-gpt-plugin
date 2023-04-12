@@ -140,11 +140,17 @@ async function run() {
     cwd: dir,
   });
 
-  await promiseSpawn("npm", ["run", "build"], {
-    cwd: dir,
-  });
+  try {
+    await promiseSpawn("npm", ["run", "build"], {
+      cwd: dir,
+    });
+  } catch {
+    console.log(
+      "Typescript errors were found, you might have to install types for some packages."
+    );
+  }
 
-  console.log("Done! Run `npm start` to start the plugin.");
+  console.log("Done! Run `npm run dev` to start the plugin.");
 }
 
 async function makeChain({ model, key }: { model: string; key: string }) {
