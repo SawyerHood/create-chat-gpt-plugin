@@ -1,6 +1,6 @@
 {
   "name": "create-chat-gpt-plugin",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Uses GPT-4 to generate a plugin for ChatGPT written in express and typescript.",
   "keywords": [
     "chatGPT",
