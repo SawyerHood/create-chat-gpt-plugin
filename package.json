@@ -1,7 +1,17 @@
 {
   "name": "create-chat-gpt-plugin",
   "version": "1.0.1",
-  "description": "",
+  "description": "Uses GPT-4 to generate a plugin for ChatGPT written in express and typescript.",
+  "keywords": [
+    "chatGPT",
+    "gpt-4",
+    "express",
+    "typescript",
+    "plugin",
+    "generator"
+  ],
+  "homepage": "https://github.com/SawyerHood/create-chat-gpt-plugin",
+  "repository": "https://github.com/SawyerHood/create-chat-gpt-plugin.git",
   "main": "index.js",
   "scripts": {
     "test": "exit 0",
@@ -12,7 +22,7 @@
   "bin": {
     "create-chat-gpt-plugin": "./index.js"
   },
-  "author": "",
+  "author": "Sawyer Hood",
   "license": "ISC",
   "devDependencies": {
     "typescript": "^5.0.4"
