@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { ChatOpenAI } from "langchain/chat_models";
 import {
   SystemMessagePromptTemplate,
@@ -11,29 +13,63 @@ import { BufferMemory } from "langchain/memory";
 import fs from "fs/promises";
 
 import dotenv from "dotenv";
-import readline from "readline";
 import path from "path";
 import process from "process";
+import prompts from "prompts";
+import promiseSpawn from "@npmcli/promise-spawn";
 
 dotenv.config();
 
 async function run() {
-  const chain = await makeChain();
+  const result = await prompts({
+    type: "text",
+    name: "name",
+    message: "What is your project named?",
+    initial: "my-plugin",
+  });
+  const projectName = result.name.trim();
 
-  const directory = (await askQuestion(
-    "Where should we put your plugin?: "
-  )) as string;
-  const topic = await askQuestion("What is the topic of your plugin: ");
+  const dir = path.resolve(projectName);
 
-  console.log("creating template...");
+  const { model } = await prompts({
+    type: "select",
+    name: "model",
+    message: "Which model would you like to use?",
+    choices: [
+      { title: "gpt-3.5-turbo", value: "gpt-3.5-turbo" },
+      { title: "gpt-4", value: "gpt-4" },
+    ],
+    initial: 0,
+  });
 
-  const dir = path.resolve(process.cwd(), directory);
+  let key = process.env.OPENAI_API_KEY ?? "";
+
+  if (!key) {
+    ({ key } = await prompts({
+      type: "password",
+      name: "key",
+      message: "What is your OpenAI API key?",
+    }));
+  }
+
+  const { topic } = await prompts({
+    type: "text",
+    name: "topic",
+    message: "What is the topic of your plugin for GPT to use for generation?",
+    initial:
+      "an endpoint that takes a github PR link and returns the title of the PR",
+  });
+
+  const chain = await makeChain({
+    key,
+    model,
+  });
 
   try {
     await fs.rm(dir);
   } catch {}
 
-  await fs.cp(".template", dir, { recursive: true });
+  await fs.cp(path.resolve(__dirname, ".template"), dir, { recursive: true });
 
   // const steps = await chain.call({
   //   input: `What are your high level thoughts on creating a plugin to ${topic}:
@@ -41,8 +77,8 @@ async function run() {
   // });
 
   // console.log(steps.response);
-
-  console.log("Writing index.ts file...");
+  console.log("Generating project, this may take a few minutes...");
+  console.log("Generating index.ts file...");
   const indexResult = await chain.call({
     input: `You should create a plugin that ${topic}. Return only the index.ts file with no commentary:
     
@@ -54,7 +90,7 @@ async function run() {
     stripMarkdown(indexResult.response)
   );
 
-  console.log("Writing openapi.yaml file...");
+  console.log("Generating openapi.yaml file...");
   const openapiResult = await chain.call({
     input: "Return only the openapi.yaml file with no commentary: \n\n",
   });
@@ -64,7 +100,7 @@ async function run() {
     stripMarkdown(openapiResult.response)
   );
 
-  console.log("Writing ai-plugin.json file...");
+  console.log("Generating ai-plugin.json file...");
   const aiPluginResult = await chain.call({
     input:
       "Return only the ai-plugin.json file with no commentary make sure auth is set to none: \n\n",
@@ -76,16 +112,49 @@ async function run() {
   );
 
   const packagesToInstall = await chain.call({
-    input: "What packages should we install?: \n\n  npm install ",
+    input:
+      "What packages should we install? Give the command to install them: \n\n ",
   });
 
-  console.log("Packages to install: ", packagesToInstall.response);
+  // regex that matches the npm install command
+  const regex = /npm install (.*)\n/g;
+  const matches = regex.exec(packagesToInstall.response);
+
+  if (matches) {
+    const packages = matches[1].split(" ");
+    const { value } = await prompts({
+      type: "confirm",
+      name: "value",
+      message: `GPT wants to install ${packages.join(", ")}, is this ok?`,
+      initial: true,
+    });
+
+    if (value) {
+      await promiseSpawn("npm", ["install", ...packages], {
+        cwd: dir,
+      });
+    }
+  }
+
+  await promiseSpawn("npm", ["install"], {
+    cwd: dir,
+  });
+
+  await promiseSpawn("npm", ["run", "build"], {
+    cwd: dir,
+  });
+
+  console.log("Done! Run `npm start` to start the plugin.");
 }
 
-async function makeChain() {
+async function makeChain({ model, key }: { model: string; key: string }) {
   const { ts, openapi, aiPlugin } = await readTemplates();
 
-  const chat = new ChatOpenAI({ temperature: 0, modelName: "gpt-4" });
+  const chat = new ChatOpenAI({
+    temperature: 0,
+    modelName: model,
+    openAIApiKey: key,
+  });
 
   const prompt = ChatPromptTemplate.fromPromptMessages([
     SystemMessagePromptTemplate.fromTemplate(
@@ -125,17 +194,14 @@ async function readTemplates(): Promise<{
   aiPlugin: string;
 }> {
   const ts = (
-    await fs.readFile(
-      path.join(process.cwd(), ".template", "index.ts"),
-      "utf-8"
-    )
+    await fs.readFile(path.resolve(__dirname, ".template", "index.ts"), "utf-8")
   )
     .replace(/\{/g, `{{`)
     .replace(/\}/g, `}}`);
 
   const openapi = (
     await fs.readFile(
-      path.join(process.cwd(), ".template", "public", "openapi.yaml"),
+      path.resolve(__dirname, ".template", "public", "openapi.yaml"),
       "utf-8"
     )
   )
@@ -144,8 +210,8 @@ async function readTemplates(): Promise<{
 
   const aiPlugin = (
     await fs.readFile(
-      path.join(
-        process.cwd(),
+      path.resolve(
+        __dirname,
         ".template",
         "public",
         ".well-known",
@@ -160,19 +226,6 @@ async function readTemplates(): Promise<{
   return { ts, openapi, aiPlugin };
 }
 
-function askQuestion(question: string) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      resolve(answer);
-      rl.close();
-    });
-  });
-}
-
 function stripMarkdown(input: string): string {
   // Define the patterns for the beginning and ending markdown code wrappers.
   const startPattern = /^```[a-z]*\r?\n/;
@@ -183,5 +236,7 @@ function stripMarkdown(input: string): string {
 
   return stripped;
 }
+
+function setupDir(path: string) {}
 
 run();

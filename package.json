@@ -2,11 +2,15 @@
   "name": "create-chat-gpt-plugin",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "index.js",
   "scripts": {
     "test": "exit 0",
     "build": "tsc",
-    "start": "tsc && node dist/index.js"
+    "start": "tsc && node index.js",
+    "prepare": "npm run build"
+  },
+  "bin": {
+    "create-chat-gpt-plugin": "./index.js"
   },
   "author": "",
   "license": "ISC",
@@ -14,8 +18,14 @@
     "typescript": "^5.0.4"
   },
   "dependencies": {
+    "@npmcli/promise-spawn": "^6.0.2",
     "@types/node": "^18.15.11",
+    "@types/npmcli__promise-spawn": "^6.0.0",
+    "@types/prompts": "^2.4.4",
+    "chalk": "^5.2.0",
+    "commander": "^10.0.0",
     "dotenv": "^16.0.3",
-    "langchain": "^0.0.51"
+    "langchain": "^0.0.51",
+    "prompts": "^2.4.2"
   }
 }
